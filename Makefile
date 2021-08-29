@@ -22,10 +22,12 @@ CPP	=cpp -nostdinc -Iinclude
 #
 ROOT_DEV= #FLOPPY 
 
+#==============依赖在下方=================
 ARCHIVES=kernel/kernel.o mm/mm.o fs/fs.o
 DRIVERS =kernel/blk_drv/blk_drv.a kernel/chr_drv/chr_drv.a
 MATH	=kernel/math/math.a
 LIBS	=lib/lib.a
+
 
 .c.s:
 	$(CC) $(CFLAGS) \
@@ -71,7 +73,8 @@ tools/system:	boot/head.o init/main.o \
 	$(LIBS) \
 	-o tools/system 
 	nm tools/system | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aU] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)'| sort > System.map 
-
+	
+#『====ARCHIVES、DRIVERS、MATH、LIBS的依赖=========
 kernel/math/math.a: FORCE
 	(cd kernel/math; make)
 
@@ -92,6 +95,7 @@ fs/fs.o: FORCE
 
 lib/lib.a: FORCE
 	(cd lib; make)
+#====ARCHIVES、DRIVERS、MATH、LIBS的依赖=========』
 
 boot/setup: boot/setup.s
 	$(AS86) -o boot/setup.o boot/setup.s
