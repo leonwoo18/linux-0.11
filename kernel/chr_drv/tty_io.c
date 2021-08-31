@@ -227,6 +227,8 @@ void copy_to_cooked(struct tty_struct * tty)
 	wake_up(&tty->secondary.proc_list);
 }
 
+
+/*经典的tty_read*/
 int tty_read(unsigned channel, char * buf, int nr)
 {
 	struct tty_struct * tty;
@@ -288,6 +290,9 @@ int tty_read(unsigned channel, char * buf, int nr)
 	return (b-buf);
 }
 
+
+
+/*经典的tty_write*/
 int tty_write(unsigned channel, char * buf, int nr)
 {
 	static int cr_flag=0;
