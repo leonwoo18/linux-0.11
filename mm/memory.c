@@ -28,16 +28,16 @@
 #include <linux/head.h>
 #include <linux/kernel.h>
 
-volatile void do_exit(long code);
+volatile void do_exit(long code);  //进程退出处理函数，在kernel/exit.c中
 
 static inline volatile void oom(void)
 {
 	printk("out of memory\n\r");
-	do_exit(SIGSEGV);
+	do_exit(SIGSEGV);            //信号值11
 }
 
 #define invalidate() \
-__asm__("movl %%eax,%%cr3"::"a" (0))
+__asm__("movl %%eax,%%cr3"::"a" (0))  //eax=0,是页目录基址；重新加载cr3来刷新cache页表
 
 /* these are not to be changed without changing head.s etc */
 #define LOW_MEM 0x100000
@@ -131,6 +131,8 @@ int free_page_tables(unsigned long from,unsigned long size)
 }
 
 /*
+ * 鏁翠釜鍐呮牳涓渶澶嶆潅鐨勫嚱鏁颁箣涓�copy_page_tables()
+ *
  *  Well, here is one of the most complicated functions in mm. It
  * copies a range of linerar addresses by copying only the pages.
  * Let's hope this is bug-free, 'cause this one I don't want to debug :-)
@@ -146,8 +148,6 @@ int free_page_tables(unsigned long from,unsigned long size)
  * doesn't take any more memory - we don't copy-on-write in the low
  * 1 Mb-range, so the pages can be shared with the kernel. Thus the
  * special case for nr=xxxx.
- *
- * 鏁翠釜鍐呮牳涓渶澶嶆潅鐨勫嚱鏁颁箣涓�copy_page_tables()
  */
 int copy_page_tables(unsigned long from,unsigned long to,long size)
 {
@@ -245,6 +245,8 @@ void un_wp_page(unsigned long * table_entry)
  * and decrementing the shared-page counter for the old page.
  *
  * If it's in code space we exit with a segment error.
+ *
+ *
  */
 void do_wp_page(unsigned long error_code,unsigned long address)
 {
@@ -364,6 +366,8 @@ static int share_page(unsigned long address)
 	}
 	return 0;
 }
+
+
 
 void do_no_page(unsigned long error_code,unsigned long address)
 {
