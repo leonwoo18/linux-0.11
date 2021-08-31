@@ -4,14 +4,21 @@
 #
 RAMDISK =  #-DRAMDISK=512
 
+#8086编译器和连接器
 AS86	=as86 -0 -a
 LD86	=ld86 -0
-
+#GNU编译器和连接器
 AS	=as
 LD	=ld
-LDFLAGS	=-m elf_i386 -Ttext 0 -e startup_32
-CC	=gcc-3.4 -march=i386 $(RAMDISK)
+
+#指定编译器为gcc-3.4；编译出的指令为80386cpu的指令
+CC	=gcc-3.4 -march=i386 $(RAMDISK)  
+
+#gcc编译器选项
 CFLAGS	=-m32 -g -Wall -O2 -fomit-frame-pointer 
+#ld连接器选项
+LDFLAGS	=-m elf_i386 -Ttext 0 -e startup_32
+
 
 CPP	=cpp -nostdinc -Iinclude
 
@@ -27,6 +34,28 @@ ARCHIVES=kernel/kernel.o mm/mm.o fs/fs.o
 DRIVERS =kernel/blk_drv/blk_drv.a kernel/chr_drv/chr_drv.a
 MATH	=kernel/math/math.a
 LIBS	=lib/lib.a
+#『====ARCHIVES、DRIVERS、MATH、LIBS的依赖=========
+kernel/math/math.a: FORCE
+	(cd kernel/math; make)
+
+kernel/blk_drv/blk_drv.a: FORCE
+	(cd kernel/blk_drv; make)
+
+kernel/chr_drv/chr_drv.a: FORCE
+	(cd kernel/chr_drv; make)
+
+kernel/kernel.o: FORCE
+	(cd kernel; make)
+
+mm/mm.o: FORCE
+	(cd mm; make)
+
+fs/fs.o: FORCE
+	(cd fs; make)
+
+lib/lib.a: FORCE
+	(cd lib; make)
+#====ARCHIVES、DRIVERS、MATH、LIBS的依赖=========』
 
 
 .c.s:
@@ -74,28 +103,6 @@ tools/system:	boot/head.o init/main.o \
 	-o tools/system 
 	nm tools/system | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aU] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)'| sort > System.map 
 	
-#『====ARCHIVES、DRIVERS、MATH、LIBS的依赖=========
-kernel/math/math.a: FORCE
-	(cd kernel/math; make)
-
-kernel/blk_drv/blk_drv.a: FORCE
-	(cd kernel/blk_drv; make)
-
-kernel/chr_drv/chr_drv.a: FORCE
-	(cd kernel/chr_drv; make)
-
-kernel/kernel.o: FORCE
-	(cd kernel; make)
-
-mm/mm.o: FORCE
-	(cd mm; make)
-
-fs/fs.o: FORCE
-	(cd fs; make)
-
-lib/lib.a: FORCE
-	(cd lib; make)
-#====ARCHIVES、DRIVERS、MATH、LIBS的依赖=========』
 
 boot/setup: boot/setup.s
 	$(AS86) -o boot/setup.o boot/setup.s
