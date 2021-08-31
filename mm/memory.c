@@ -146,6 +146,8 @@ int free_page_tables(unsigned long from,unsigned long size)
  * doesn't take any more memory - we don't copy-on-write in the low
  * 1 Mb-range, so the pages can be shared with the kernel. Thus the
  * special case for nr=xxxx.
+ *
+ * 整个内核中最复杂的函数之一copy_page_tables()
  */
 int copy_page_tables(unsigned long from,unsigned long to,long size)
 {
