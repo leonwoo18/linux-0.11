@@ -14,13 +14,20 @@ LD	=ld
 #指定编译器为gcc-3.4；编译出的指令为80386cpu的指令
 CC	=gcc-3.4 -march=i386 $(RAMDISK)  
 
-#gcc编译器选项
+#gcc编译器选项  ：-Wall=warn all , -o=optimze 
 CFLAGS	=-m32 -g -Wall -O2 -fomit-frame-pointer 
-#ld连接器选项
+#ld连接器选项   ：elf_i386为链接工具, startup_32为内存位置0x100000
 LDFLAGS	=-m elf_i386 -Ttext 0 -e startup_32
 
 
+#cpp：gcc的预处理程序
+#-nostdinc: 不要去std标准目录中的inc头文件
+#-Iinclude: -I指定目录
 CPP	=cpp -nostdinc -Iinclude
+
+
+
+
 
 #
 # ROOT_DEV specifies the default root-device when making the image.
@@ -67,12 +74,20 @@ lib/lib.a: FORCE
 	$(CC) $(CFLAGS) \
 	-nostdinc -Iinclude -c -o $*.o $<
 
+
+
+
+
+
+
+#make/makeall 入口
 all:	Image
 
 Image: boot/bootsect boot/setup tools/system tools/build
 	cp -f tools/system system.tmp
 	strip system.tmp
 	objcopy -O binary -R .note -R .comment system.tmp tools/kernel
+#核心的一句：用build工具，把bootsect、setup、system（这里copy为kernel）合成一个镜像文件Image
 	tools/build boot/bootsect boot/setup tools/kernel $(ROOT_DEV) > Image
 	rm system.tmp
 	rm tools/kernel -f
