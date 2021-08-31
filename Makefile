@@ -33,7 +33,8 @@ CPP	=cpp -nostdinc -Iinclude
 # ROOT_DEV specifies the default root-device when making the image.
 # This can be either FLOPPY, /dev/xxxx or empty, in which case the
 # default of /dev/hd6 is used by 'build'.
-#
+
+# build工具用到的以$(ROOT_DEV)为根文件系统设备组装成内核映像Image
 ROOT_DEV= #FLOPPY 
 
 #==============依赖在下方=================
@@ -65,13 +66,17 @@ lib/lib.a: FORCE
 #====ARCHIVES、DRIVERS、MATH、LIBS的依赖=========』
 
 
+
+
 .c.s:
 	$(CC) $(CFLAGS) \
+	                   #-S:只翻译成.s汇编语言
 	-nostdinc -Iinclude -S -o $*.s $<
 .s.o:
 	$(AS)  -o $*.o $<
 .c.o:
 	$(CC) $(CFLAGS) \
+	                   #-C:只编译成目标文件，不链接
 	-nostdinc -Iinclude -c -o $*.o $<
 
 
@@ -84,16 +89,19 @@ lib/lib.a: FORCE
 all:	Image
 
 Image: boot/bootsect boot/setup tools/system tools/build
+    #将system模块复制为system.tmp，并strip减少文件大小
+	#并用objcopy工具(-R .note -R .comment删减掉注释和评论)，转换为kernel可执行二进制文件
 	cp -f tools/system system.tmp
 	strip system.tmp
 	objcopy -O binary -R .note -R .comment system.tmp tools/kernel
-#核心的一句：用build工具，把bootsect、setup、system（这里copy为kernel）合成一个镜像文件Image
+#核心的一句：用build工具，把bootsect、setup、system（这里已copy为kernel）合成一个镜像文件Image
 	tools/build boot/bootsect boot/setup tools/kernel $(ROOT_DEV) > Image
 	rm system.tmp
 	rm tools/kernel -f
 	sync
 
 disk: Image
+    #dd=disk dump,bs=bytes; if=infile; of=outfile
 	dd bs=8192 if=Image of=/dev/fd0
 
 BootImage: boot/bootsect boot/setup tools/build
@@ -110,28 +118,34 @@ boot/head.o: boot/head.s
 
 tools/system:	boot/head.o init/main.o \
 		$(ARCHIVES) $(DRIVERS) $(MATH) $(LIBS)
+	#将所有东西链接为system模块
 	$(LD) $(LDFLAGS) boot/head.o init/main.o \
 	$(ARCHIVES) \
 	$(DRIVERS) \
 	$(MATH) \
 	$(LIBS) \
 	-o tools/system 
+	#> System.map表示ld需要将连接映像重定向保存在System.map文件中
 	nm tools/system | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aU] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)'| sort > System.map 
 	
-
+#setup.s和bootsect.s使用的是8086汇编和链接器
 boot/setup: boot/setup.s
 	$(AS86) -o boot/setup.o boot/setup.s
 	$(LD86) -s -o boot/setup boot/setup.o
-
 boot/bootsect:	boot/bootsect.s
 	$(AS86) -o boot/bootsect.o boot/bootsect.s
 	$(LD86) -s -o boot/bootsect boot/bootsect.o
 
+#往bootsect.s程序开头添加一行system文件长度的信息
 tmp.s:	boot/bootsect.s tools/system
 	(echo -n "SYSSIZE = (";ls -l tools/system | grep system \
 		| cut -c25-31 | tr '\012' ' '; echo "+ 15 ) / 16") > tmp.s
 	cat boot/bootsect.s >> tmp.s
+	
 
+
+
+#make clean入口
 clean:
 	rm -f Image System.map tmp_make core boot/bootsect boot/setup
 	rm -f init/*.o tools/system tools/build boot/*.o
@@ -140,9 +154,17 @@ clean:
 	(cd kernel;make clean)
 	(cd lib;make clean)
 
+
+#先执行上面的clean，再对/linux目录进行压缩，最终生成backup.Z压缩文件
 backup: clean
 	(cd .. ; tar cf - linux | compress16 - > backup.Z)
 	sync
+
+
+
+
+
+
 
 dep:
 	sed '/\#\#\# Dependencies/q' < Makefile > tmp_make
