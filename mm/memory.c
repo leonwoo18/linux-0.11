@@ -40,25 +40,30 @@ static inline volatile void oom(void)
 __asm__("movl %%eax,%%cr3"::"a" (0))  //eax=0,是页目录基址；重新加载cr3来刷新cache页表
 
 /* these are not to be changed without changing head.s etc */
-#define LOW_MEM 0x100000
-#define PAGING_MEMORY (15*1024*1024)
-#define PAGING_PAGES (PAGING_MEMORY>>12)
-#define MAP_NR(addr) (((addr)-LOW_MEM)>>12)
+#define LOW_MEM 0x100000                      //内存低端(1MB)
+#define PAGING_MEMORY (15*1024*1024)          //分页内存15MB。主内存区最多15MB
+#define PAGING_PAGES (PAGING_MEMORY>>12)      //分页后的物理内存页数
+#define MAP_NR(addr) (((addr)-LOW_MEM)>>12)   //指定内存地址映射为页号
 #define USED 100
 
-#define CODE_SPACE(addr) ((((addr)+4095)&~4095) < \
-current->start_code + current->end_code)
+#define CODE_SPACE(addr) ((((ad_dr)+4095)&~4095) < \   //判断do_wp_page()中给定地址是否位于
+current->start_code + current->end_code)              //当前进程的代码段中
 
 static long HIGH_MEMORY = 0;
 
-#define copy_page(from,to) \
-__asm__("cld ; rep ; movsl"::"S" (from),"D" (to),"c" (1024))
+
+#define copy_page(from,to) \       
+// cld指令:将EFLAGS寄存器中的DF（方向标志）置为0,即 DF=0;表示正向传送，每次操作后si，di递增 
+// rep指令:重复其后指定的字符串操作指令,repet次数由计数寄存器cx来决定      
+// movsb指令：串传送指令，rep决定传输次数，cld决定传输方向
+__asm__("cld ; rep ; movsl"::"S" (from),"D" (to),"c" (1024))  // 从from处复制1页内存到to处(1页4K字节)
 
 static unsigned char mem_map [ PAGING_PAGES ] = {0,};
 
 /*
  * Get physical address of first (actually last :-) free page, and mark it
  * used. If no free pages left, return 0.
+ * 取空闲页。如果已经没有可用内存了，则返回0
  */
 unsigned long get_free_page(void)
 {
@@ -79,23 +84,24 @@ __asm__("std ; repne ; scasb\n\t"
 	:"0" (0),"i" (LOW_MEM),"c" (PAGING_PAGES),
 	"D" (mem_map+PAGING_PAGES-1)
 	);
-return __res;
+return __res;       //返回空闲页面地址(如果无空闲则返回0)
 }
 
 /*
  * Free a page of memory at physical address 'addr'. Used by
  * 'free_page_tables()'
+ * 释放物理地址addr开始的一页内存
  */
 void free_page(unsigned long addr)
 {
 	if (addr < LOW_MEM) return;
 	if (addr >= HIGH_MEMORY)
 		panic("trying to free nonexistent page");
-	addr -= LOW_MEM;
-	addr >>= 12;
-	if (mem_map[addr]--) return;
+	addr -= LOW_MEM;              //物理地址-低端内存位置
+	addr >>= 12;                  //再除以4KB，得页面号
+	if (mem_map[addr]--) return;         //mem_map[addr]为页面映射字节，if不为0时，-1并return
 	mem_map[addr]=0;
-	panic("trying to free free page");
+	panic("trying to free free page");   //否则置0后，并显示出错信息，死机
 }
 
 /*
@@ -131,7 +137,7 @@ int free_page_tables(unsigned long from,unsigned long size)
 }
 
 /*
- * 鏁翠釜鍐呮牳涓渶澶嶆潅鐨勫嚱鏁颁箣涓�copy_page_tables()
+ * 内核中最复杂的函数之一copy_page_tables()
  *
  *  Well, here is one of the most complicated functions in mm. It
  * copies a range of linerar addresses by copying only the pages.
@@ -154,14 +160,16 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
 	unsigned long * from_page_table;
 	unsigned long * to_page_table;
 	unsigned long this_page;
-	unsigned long * from_dir, * to_dir;
+	unsigned long * from_dir, * to_dir;   //源地址和目的地址の目录项指针
 	unsigned long nr;
 
 	if ((from&0x3fffff) || (to&0x3fffff))
 		panic("copy_page_tables called with wrong alignment");
-	from_dir = (unsigned long *) ((from>>20) & 0xffc); /* _pg_dir = 0 */
+	
+	from_dir = (unsigned long *) ((from>>20) & 0xffc);   //由传入参数计算得到
 	to_dir = (unsigned long *) ((to>>20) & 0xffc);
-	size = ((unsigned) (size+0x3fffff)) >> 22;
+	size = ((unsigned) (size+0x3fffff)) >> 22;           //页表目录项数
+	
 	for( ; size-->0 ; from_dir++,to_dir++) {
 		if (1 & *to_dir)
 			panic("copy_page_tables: already exist");
