@@ -203,6 +203,8 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
  * It returns the physical address of the page gotten, 0 if
  * out of memory (either when trying to access page-table or
  * page.)
+ *
+ * 把一物理内存页面 map 到指定的虚拟地址
  */
 unsigned long put_page(unsigned long page,unsigned long address)
 {
@@ -228,6 +230,8 @@ unsigned long put_page(unsigned long page,unsigned long address)
 	return page;
 }
 
+
+/*取消页面的写保护*/
 void un_wp_page(unsigned long * table_entry)
 {
 	unsigned long old_page,new_page;
@@ -384,7 +388,7 @@ void do_no_page(unsigned long error_code,unsigned long address)
 	unsigned long page;
 	int block,i;
 
-	address &= 0xfffff000;
+	address &= 0xfffff000;            //将虚拟地址后12位置0，前20位即虚拟页号
 	tmp = address - current->start_code;
 	if (!current->executable || tmp >= current->end_data) {
 		get_empty_page(address);
