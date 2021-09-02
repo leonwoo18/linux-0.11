@@ -389,26 +389,36 @@ void do_no_page(unsigned long error_code,unsigned long address)
 	int block,i;
 
 	address &= 0xfffff000;            //将虚拟地址后12位置0，前20位即虚拟页号
-	tmp = address - current->start_code;
+	tmp = address - current->start_code;   //指定虚拟地址页面  相对进程的基址的偏移
+
+	/*if当前进程的executable空，or指定虚拟地址超出代码+数据长度*/
 	if (!current->executable || tmp >= current->end_data) {
-		get_empty_page(address);
+		get_empty_page(address);         //则申请一页物理内存
 		return;
 	}
+	
 	if (share_page(tmp))
 		return;
 	if (!(page = get_free_page()))
-		oom();
+		oom();      //内存不够，进程终止
+	
 /* remember that 1 block is used for header */
-	block = 1 + tmp/BLOCK_SIZE;
+	block = 1 + tmp/BLOCK_SIZE;    //BLOCK_SIZE=1024B,一页需要4块
+
 	for (i=0 ; i<4 ; block++,i++)
-		nr[i] = bmap(current->executable,block);
-	bread_page(page,current->executable->i_dev,nr);
+		nr[i] = bmap(current->executable,block);     //取到磁盘设备上的逻辑块号nr
+	/*读文件系统，取块(一页4块)到指定物理地址page*/	
+	bread_page(page,current->executable->i_dev,nr);  //i_dev,nr为磁盘设备号和数据块号
+	
+	/*对物理页面超出的部分进行清零处理*/
 	i = tmp + 4096 - current->end_data;
 	tmp = page + 4096;
 	while (i-- > 0) {
 		tmp--;
 		*(char *)tmp = 0;
 	}
+	
+	
 	if (put_page(page,address))
 		return;
 	free_page(page);
