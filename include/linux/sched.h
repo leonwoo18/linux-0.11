@@ -111,13 +111,13 @@ struct task_struct {
 	long blocked;	/* bitmap of masked signals */
 /* various fields */
 	int exit_code;
-	unsigned long start_code,end_code,end_data,brk,start_stack;  #代码段、数据段、堆栈段
-	long pid,father,pgrp,session,leader;                         #进程号、父进程号
-	unsigned short uid,euid,suid;                                #用户id（有效、保存）
+	unsigned long start_code,end_code,end_data,brk,start_stack;  //代码段、数据段、堆栈段
+	long pid,father,pgrp,session,leader;                         //进程号、父进程号
+	unsigned short uid,euid,suid;                                //用户id（有效、保存）
 	unsigned short gid,egid,sgid;
 	
-	long alarm;                                                  #进程报警定时值
-	long utime,stime,cutime,cstime,start_time;                   #运行时间（用户态和内核态、子进程用户态和内核态、进程开始时刻）
+	long alarm;                                                  //进程报警定时值
+	long utime,stime,cutime,cstime,start_time;                   //运行时间（用户态和内核态、子进程用户态和内核态、进程开始时刻）
 	unsigned short used_math;
 /* file system info */
 	int tty;		/* -1 if no tty, so it must be signed */
