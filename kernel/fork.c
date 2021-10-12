@@ -36,6 +36,10 @@ void verify_area(void * addr,int size)
 	}
 }
 
+/*
+*给新进程的"代码段"和"数据段"设置 基址、限长并复制页表
+*nr为新任务号，p为新进程task_struct结构体的指针
+*/
 int copy_mem(int nr,struct task_struct * p)
 {
 	unsigned long old_data_base,new_data_base,data_limit;
@@ -75,11 +79,15 @@ int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
 	int i;
 	struct file *f;
 
-	p = (struct task_struct *) get_free_page();
-	if (!p)
-		return -EAGAIN;
-	task[nr] = p;
-	*p = *current;	/* NOTE! this doesn't copy the supervisor stack */
+	p = (struct task_struct *) get_free_page();  //为新进程的PCB分配内存
+	if (!p)                                      //若内存分配出错
+		return -EAGAIN;                          //则返回错误码并退出
+	task[nr] = p;         //task[] 数组为新进程update    
+	
+	*p = *current;	/* NOTE! this doesn't copy the 超级用户的堆栈 */
+	                /*只复制当前进程的内容*/
+
+	/*对新进程的一些成员变量进行赋值*/
 	p->state = TASK_UNINTERRUPTIBLE;
 	p->pid = last_pid;
 	p->father = current->pid;
@@ -90,6 +98,8 @@ int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
 	p->utime = p->stime = 0;
 	p->cutime = p->cstime = 0;
 	p->start_time = jiffies;
+
+	/*对新进程的任务状态段tss进行赋值*/
 	p->tss.back_link = 0;
 	p->tss.esp0 = PAGE_SIZE + (long) p;
 	p->tss.ss0 = 0x10;
@@ -111,22 +121,32 @@ int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
 	p->tss.gs = gs & 0xffff;
 	p->tss.ldt = _LDT(nr);
 	p->tss.trace_bitmap = 0x80000000;
+
+	
 	if (last_task_used_math == current)
 		__asm__("clts ; fnsave %0"::"m" (p->tss.i387));
-	if (copy_mem(nr,p)) {
-		task[nr] = NULL;
-		free_page((long) p);
+
+
+	//copy_mem()给新进程的"代码段"和"数据段"设置 基址、限长并复制页表
+	if (copy_mem(nr,p)) {      //返回不为0，则表示出错
+		task[nr] = NULL;       //复位task[]数组中的相应项
+		free_page((long) p);   //释放该进程分配的内存
 		return -EAGAIN;
 	}
+
+	
 	for (i=0; i<NR_OPEN;i++)
-		if ((f=p->filp[i]))
-			f->f_count++;
+		if (f=p->filp[i])     //若父进程中有文件是打开的
+			f->f_count++;     //则对应文件打开次数增1
+
+		
 	if (current->pwd)
 		current->pwd->i_count++;
 	if (current->root)
 		current->root->i_count++;
 	if (current->executable)
 		current->executable->i_count++;
+	
 	set_tss_desc(gdt+(nr<<1)+FIRST_TSS_ENTRY,&(p->tss));
 	set_ldt_desc(gdt+(nr<<1)+FIRST_LDT_ENTRY,&(p->ldt));
 	p->state = TASK_RUNNING;	/* do this last, just in case */

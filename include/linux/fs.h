@@ -114,10 +114,12 @@ struct m_inode {
 };
 
 struct file {
-	unsigned short f_mode;
-	unsigned short f_flags;
-	unsigned short f_count;
-	struct m_inode * f_inode;
+	unsigned short f_mode;    //文件操作位（RW位）
+	unsigned short f_flags;   //文件打开和控制的标志
+
+	unsigned short f_count;   //对应文件句柄数 （f_count=n，即fd=n）
+	
+	struct m_inode * f_inode; //指向对应的inode
 	off_t f_pos;
 };
 
