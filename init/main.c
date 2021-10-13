@@ -55,7 +55,7 @@ extern long startup_time;
 /*
  * This is set up by the setup-routine at boot-time
  */
-#define EXT_MEM_K (*(unsigned short *)0x90002)
+#define EXT_MEM_K (*(unsigned short *)0x90002)      //1MB以后的扩展内存大小（KB）
 #define DRIVE_INFO (*(struct drive_info *)0x90080)
 #define ORIG_ROOT_DEV (*(unsigned short *)0x901FC)
 
@@ -110,20 +110,20 @@ void main(void)		/* This really IS void, no error here. */
 {			/* The startup routine assumes (在head.s程序136行的那几行代码) this */
 
 
-/*此时中断仍被禁止着. Do necessary setups, thenenable them*/
+/*此时中断仍被禁止着. Do necessary setups, 再打开中断*/
 
 
 /*1.对物理内存各部分进行功能划分与分配*/
  	ROOT_DEV = ORIG_ROOT_DEV;     //根设备号（放在0x901FC）
  	drive_info = DRIVE_INFO;      //硬盘参数表信息(放在0x90080)
 	/*主内存数memory_end*/
-	memory_end = (1<<20) + (EXT_MEM_K<<10);  //内存大小=1Mb+扩展内存(k)*1024字节
-	memory_end &= 0xfffff000;
-	if (memory_end > 16*1024*1024)
+	memory_end = (1<<20) + (EXT_MEM_K<<10);  //内存大小=1Mb+扩展内存(kB)*1024字节
+	memory_end &= 0xfffff000;                //最后不到4kb（1页）的内存碎片忽略掉
+	if (memory_end > 16*1024*1024)           //如果内存超过16Mb，则按16Mb计
 		memory_end = 16*1024*1024;
-	
-	if (memory_end > 12*1024*1024) 
-		buffer_memory_end = 4*1024*1024;
+	/*高速缓冲区末端buffer_memory_end*/
+	if (memory_end > 12*1024*1024)           //根据主内存大小, 设置缓冲区大小
+		buffer_memory_end = 4*1024*1024;     
 	else if (memory_end > 6*1024*1024)
 		buffer_memory_end = 2*1024*1024;
 	else
