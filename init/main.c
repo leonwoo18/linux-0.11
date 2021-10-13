@@ -121,6 +121,7 @@ void main(void)		/* This really IS void, no error here. */
 	memory_end &= 0xfffff000;                //最后不到4kb（1页）的内存碎片忽略掉
 	if (memory_end > 16*1024*1024)           //如果内存超过16Mb，则按16Mb计
 		memory_end = 16*1024*1024;
+
 	/*高速缓冲区末端buffer_memory_end*/
 	if (memory_end > 12*1024*1024)           //根据主内存大小, 设置缓冲区大小
 		buffer_memory_end = 4*1024*1024;     
@@ -128,29 +129,41 @@ void main(void)		/* This really IS void, no error here. */
 		buffer_memory_end = 2*1024*1024;
 	else
 		buffer_memory_end = 1*1024*1024;
+	
 	/*主内存开始地址main_memory_start*/
 	main_memory_start = buffer_memory_end;
-#ifdef RAMDISK
-	main_memory_start += rd_init(main_memory_start, RAMDISK*1024);
+#ifdef RAMDISK    //如果makefile定义了RAMDISK，则初始化RAMDISK
+	main_memory_start += rd_init(main_memory_start, RAMDISK*1024); //main_memory_start加上RAMDISK大小
 #endif
 
 	mem_init(main_memory_start,memory_end);
 
 /*2.对系统各部分初始化*/
-	trap_init();
-	blk_dev_init();
-	chr_dev_init();
-	tty_init();
+	trap_init();        //kernel/traps.c
+	
+	blk_dev_init();     //kernel/blk_drv/ll_rw_blk.c
+	hd_init();          //kernel/blk_drv/hd.c
+	floppy_init();      //kernel/blk_drv/floppy.c
+	
+	chr_dev_init();     //kernel/chr_drv/tty_io.c
+	tty_init();         //kernel/chr_drv/tty_io.c
+	
 	time_init();
-	sched_init();
-	buffer_init(buffer_memory_end);
-	hd_init();
-	floppy_init();
+	
+	sched_init();       //kernel/sched.c
+	
+	buffer_init(buffer_memory_end); //fs/buffer.c
+
+/*所有初始化工作done，开启中断*/
 	sti();
+
+/*移动到用户模式下，进程0执行*/
 	move_to_user_mode();
+
 	if (!fork()) {		/* we count on this going ok */
-		init();
+		init();         //创建进程1
 	}
+	for(;;) pause();   //空闲时执行pause()
 /*
  *   NOTE!!   For any other task 'pause()' would mean we have to get a
  * signal to awaken, but task0 is the sole exception (see 'schedule()')
@@ -158,7 +171,6 @@ void main(void)		/* This really IS void, no error here. */
  * can run). For task0 'pause()' just means we go check if some other
  * task can run, and if not we return here.
  */
-	for(;;) pause();
 }
 
 static int printf(const char *fmt, ...)
