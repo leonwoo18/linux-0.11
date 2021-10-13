@@ -4,13 +4,13 @@
  *  (C) 1991  Linus Torvalds
  */
 
-#define __LIBRARY__
+#define __LIBRARY__   //为了包含定义在unistd.h中的系统调用号和内嵌汇编代码_syscall0()等
 #include <unistd.h>
 #include <time.h>
 
 /*
- * we need this inline - forking from kernel space will result
- * in NO COPY ON WRITE (!!!), until an execve is executed. This
+ * we need this inline内嵌语句 - forking from kernel space will result
+ * in NO COPY ON WRITE (没有写时复制!!!), until an execve is executed. This
  * is no problem, but for the stack. This is handled by not letting
  * main() use the stack at all after fork(). Thus, no function
  * calls - which means inline code for fork too, as otherwise we
@@ -95,35 +95,48 @@ static void time_init(void)
 	startup_time = kernel_mktime(&time);
 }
 
-static long memory_end = 0;
-static long buffer_memory_end = 0;
-static long main_memory_start = 0;
 
-struct drive_info { char dummy[32]; } drive_info;
+
+
+
+
+static long memory_end = 0;            //机器具有的物理内存容量(字节数)
+static long buffer_memory_end = 0;     //高速缓冲区end地址
+static long main_memory_start = 0;     //主内存开始位置
+
+struct drive_info { char dummy[32]; } drive_info; //用于存放硬盘参数表info
 
 void main(void)		/* This really IS void, no error here. */
-{			/* The startup routine assumes (well, ...) this */
-/*
- * Interrupts are still disabled. Do necessary setups, then
- * enable them
- */
- 	ROOT_DEV = ORIG_ROOT_DEV;
- 	drive_info = DRIVE_INFO;
-	memory_end = (1<<20) + (EXT_MEM_K<<10);
+{			/* The startup routine assumes (在head.s程序136行的那几行代码) this */
+
+
+/*此时中断仍被禁止着. Do necessary setups, thenenable them*/
+
+
+/*1.对物理内存各部分进行功能划分与分配*/
+ 	ROOT_DEV = ORIG_ROOT_DEV;     //根设备号（放在0x901FC）
+ 	drive_info = DRIVE_INFO;      //硬盘参数表信息(放在0x90080)
+	/*主内存数memory_end*/
+	memory_end = (1<<20) + (EXT_MEM_K<<10);  //内存大小=1Mb+扩展内存(k)*1024字节
 	memory_end &= 0xfffff000;
 	if (memory_end > 16*1024*1024)
 		memory_end = 16*1024*1024;
+	
 	if (memory_end > 12*1024*1024) 
 		buffer_memory_end = 4*1024*1024;
 	else if (memory_end > 6*1024*1024)
 		buffer_memory_end = 2*1024*1024;
 	else
 		buffer_memory_end = 1*1024*1024;
+	/*主内存开始地址main_memory_start*/
 	main_memory_start = buffer_memory_end;
 #ifdef RAMDISK
 	main_memory_start += rd_init(main_memory_start, RAMDISK*1024);
 #endif
+
 	mem_init(main_memory_start,memory_end);
+
+/*2.对系统各部分初始化*/
 	trap_init();
 	blk_dev_init();
 	chr_dev_init();

@@ -136,7 +136,7 @@ tmp_floppy_area:
 
 after_page_tables:
 	pushl $0		# These are the parameters to main :-)
-	pushl $0
+	pushl $0        # init/main.c中的main(void)的参数
 	pushl $0
 	pushl $L6		# return address for main, if it decides to.
 	pushl $main
