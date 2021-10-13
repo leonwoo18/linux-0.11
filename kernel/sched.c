@@ -106,7 +106,7 @@ void math_state_restore()
 void schedule(void)
 {
 	int i,next,c;
-	struct task_struct ** p;    //任务结构体の指针の指针
+	struct task_struct ** p;    //任务结构体<-指针<-指针
 
 /* check alarm, wake up 任何可中断任务 that have got a signal */
 
@@ -121,13 +121,13 @@ void schedule(void)
 				(*p)->state=TASK_RUNNING;                  //置任务为就绪状态
 		}
 
-/* this is the 真正的scheduler 【精彩到不行】*/
+/* this is the 真正的scheduler，精彩到不行*/
 
 	while (1) {
 		c = -1;
 		next = 0;
 		i = NR_TASKS;           
-		p = &task[NR_TASKS];       //任务数组の最后任务
+		p = &task[NR_TASKS];       //task[]数组最后的任务
 		while (--i) {
 			if (!*--p)
 				continue;
