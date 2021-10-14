@@ -72,10 +72,16 @@ nr_system_calls = 72
 bad_sys_call:
 	movl $-1,%eax
 	iret
+
+
+
+	
 .align 2
 reschedule:
-	pushl $ret_from_sys_call
-	jmp schedule
+	pushl $ret_from_sys_call    #压栈，最后执行，为第五段
+	jmp schedule                #跳到schedule.c，执行中间3段
+		
+#五段论第一段入口，int 0x80入口
 .align 2
 system_call:
 	cmpl $nr_system_calls-1,%eax
@@ -91,13 +97,17 @@ system_call:
 	mov %dx,%es
 	movl $0x17,%edx		# fs points to local data space
 	mov %dx,%fs
-	call sys_call_table(,%eax,4)
+	
+	call sys_call_table(,%eax,4)   #根椐eax寄存器中的功能号来调用sys_xxx()
+	
 	pushl %eax
 	movl current,%eax
 	cmpl $0,state(%eax)		# state
 	jne reschedule
 	cmpl $0,counter(%eax)		# counter
-	je reschedule
+	je reschedule            #跳到上面的reschedule入口
+
+#五段论最后一段入口
 ret_from_sys_call:
 	movl current,%eax		# task[0] cannot have signals
 	cmpl task,%eax
@@ -127,8 +137,13 @@ ret_from_sys_call:
 	pop %ds
 	iret
 
+
+
+
+
+
 .align 2
-coprocessor_error:
+coprocessor_error:          #int 0x16 ：协处理器出错
 	push %ds
 	push %es
 	push %fs
@@ -145,7 +160,7 @@ coprocessor_error:
 	jmp math_error
 
 .align 2
-device_not_available:
+device_not_available:       #int 0x7：设备不存在
 	push %ds
 	push %es
 	push %fs
@@ -173,7 +188,7 @@ device_not_available:
 	ret
 
 .align 2
-timer_interrupt:
+timer_interrupt:         #int 0x32 时钟中断
 	push %ds		# save ds,es and put kernel data space
 	push %es		# into them. %fs is used by _system_call
 	push %fs
@@ -196,8 +211,12 @@ timer_interrupt:
 	addl $4,%esp		# task switching to accounting ...
 	jmp ret_from_sys_call
 
+
+
+
+
 .align 2
-sys_execve:
+sys_execve:                  
 	lea EIP(%esp),%eax
 	pushl %eax
 	call do_execve
@@ -218,7 +237,14 @@ sys_fork:
 	addl $20,%esp
 1:	ret
 
-hd_interrupt:
+
+
+
+
+
+
+
+hd_interrupt:                 #int 0x46：银盘中断处理程序
 	pushl %eax
 	pushl %ecx
 	pushl %edx
@@ -249,7 +275,7 @@ hd_interrupt:
 	popl %eax
 	iret
 
-floppy_interrupt:
+floppy_interrupt:            #int 0x48：银盘中断处理程序
 	pushl %eax
 	pushl %ecx
 	pushl %edx
@@ -277,7 +303,7 @@ floppy_interrupt:
 	popl %eax
 	iret
 
-parallel_interrupt:
+parallel_interrupt:          #int 0x39 (int 0x27):并行口中断处理程序
 	pushl %eax
 	movb $0x20,%al
 	outb %al,$0x20

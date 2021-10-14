@@ -13,7 +13,7 @@
  *作用:直接将代码内嵌进来，不会发生调用，不会使用堆栈
  *fork()、pause()需要使用内嵌方式，以保证main()不会弄乱堆栈
  */
-static inline _syscall0(int,fork)
+static inline _syscall0(int,fork)  
 static inline _syscall0(int,pause)
 	/*
 	 * we need this inline内嵌语句 - forking from kernel space will result
