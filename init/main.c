@@ -9,20 +9,27 @@
 #include <time.h>
 
 /*
- * we need this inline内嵌语句 - forking from kernel space will result
- * in NO COPY ON WRITE (没有写时复制!!!), until an execve is executed. This
- * is no problem, but for the stack. This is handled by not letting
- * main() use the stack at all after fork(). Thus, no function
- * calls - which means inline code for fork too, as otherwise we
- * would use the stack upon exit from 'fork()'.
- *
- * Actually only pause and fork are needed inline, so that there
- * won't be any messing with the stack from main(), but we define
- * some others too.
+ *inline关键字修饰的函数为内嵌函数
+ *作用:直接将代码内嵌进来，不会发生调用，不会使用堆栈
+ *fork()、pause()需要使用内嵌方式，以保证main()不会弄乱堆栈
  */
 static inline _syscall0(int,fork)
 static inline _syscall0(int,pause)
-static inline _syscall1(int,setup,void *,BIOS)
+	/*
+	 * we need this inline内嵌语句 - forking from kernel space will result
+	 * in NO COPY ON WRITE (没有写时复制!!!), until an execve is executed. This
+	 * is no problem, but for the stack. This is handled by not letting
+	 * main() use the stack at all after fork(). Thus, no function
+	 * calls - which means inline code for fork too, as otherwise we
+	 * would use the stack upon exit from 'fork()'.
+	 *
+	 * Actually only pause and fork are needed inline, so that there
+	 * won't be any messing with the stack from main(), but we define
+	 * some others too.
+	 */
+
+
+static inline _syscall1(int,setup,void *,BIOS)   //仅在此程序的init()被调用
 static inline _syscall0(int,sync)
 
 #include <linux/tty.h>
@@ -160,10 +167,10 @@ void main(void)		/* This really IS void, no error here. */
 /*移动到用户模式下，进程0执行*/
 	move_to_user_mode();
 
-	if (!fork()) {		/* we count on this going ok */
-		init();         //创建进程1
+	if (!fork()) {	   //父进程执行fork()，成功创建后返回0给子进程
+		init();              //子进程执行init()
 	}
-	for(;;) pause();   //空闲时执行pause()
+	for(;;) pause();   //父进程空闲时执行pause()
 /*
  *   NOTE!!   For any other task 'pause()' would mean we have to get a
  * signal to awaken, but task0 is the sole exception (see 'schedule()')
@@ -172,6 +179,11 @@ void main(void)		/* This really IS void, no error here. */
  * task can run, and if not we return here.
  */
 }
+
+
+
+
+
 
 static int printf(const char *fmt, ...)
 {
@@ -194,7 +206,9 @@ void init(void)
 {
 	int pid,i;
 
-	setup((void *) &drive_info);
+    /*为系统调用sys_setup(),在上面25行的宏定义_syscall1(int,setup,void *,BIOS)*/
+	setup((void *) &drive_info);   
+	
 	(void) open("/dev/tty0",O_RDWR,0);
 	(void) dup(0);
 	(void) dup(0);
