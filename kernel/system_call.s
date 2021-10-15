@@ -5,16 +5,90 @@
  */
 
 /*
- *  system_call.s  contains the system-call low-level handling routines.
- * This also contains the timer-interrupt handler, as some of the code is
- * the same. The hd- and flopppy-interrupts are also here.
+ *  system_call.s  包含  system_call（int 0x80中断） low-level handling routines.
+ * This also contains the 时钟中断 handler, as some of the code is
+ * the same. The 硬盘和软盘中断 are also here.
  *
- * NOTE: This code handles signal-recognition, which happens every time
- * after a timer-interrupt and after each system call. Ordinary interrupts
- * don't handle signal-recognition, as that would clutter them up totally
- * unnecessarily.
+ * NOTE: This code handles 信号识别, which happens every time after a 时钟中断(int 0x20) and 系统调用(int 0x80). 
+ *普通中断 不用处理 信号识别, 否则会给系统造成混乱.
  *
- * Stack layout in 'ret_from_system_call':
+ */
+
+SIG_CHLD	= 17     #子进程停止或结束
+
+EAX		= 0x00        #各个寄存器在堆栈中的偏移位置
+EBX		= 0x04
+ECX		= 0x08
+EDX		= 0x0C
+FS		= 0x10
+ES		= 0x14
+DS		= 0x18
+EIP		= 0x1C
+CS		= 0x20
+EFLAGS		= 0x24
+OLDESP		= 0x28
+OLDSS		= 0x2C
+
+state	= 0	     	  # task-struct 结构体的成员变量的偏移值
+counter	= 4
+priority = 8
+signal	= 12
+sigaction = 16	 
+blocked = (33*16)
+
+
+sa_handler = 0        # sigaction结构体的成员变量的偏移值
+sa_mask = 4
+sa_flags = 8
+sa_restorer = 12
+
+nr_system_calls = 72     #linux 0.11版内核中的系统调用总数
+
+
+
+
+.globl system_call,sys_fork,timer_interrupt,sys_execve
+.globl hd_interrupt,floppy_interrupt,parallel_interrupt
+.globl device_not_available, coprocessor_error
+
+
+
+
+.align 2
+bad_sys_call:
+	movl $-1,%eax
+	iret
+
+.align 2
+reschedule:
+	pushl $ret_from_sys_call    #压栈，最后执行，为第五段
+	jmp schedule                #跳到schedule.c，执行中间3段
+		
+.align 2
+system_call:     #五段论第一段入口，int 0x80入口
+	cmpl $nr_system_calls-1,%eax
+	ja bad_sys_call
+	push %ds
+	push %es
+	push %fs
+	pushl %edx
+	pushl %ecx		# push %ebx,%ecx,%edx as parameters
+	pushl %ebx		# to the system call
+	movl $0x10,%edx		# set up ds,es to kernel space
+	mov %dx,%ds
+	mov %dx,%es
+	movl $0x17,%edx		# fs points to local data space
+	mov %dx,%fs
+	call sys_call_table(,%eax,4)   #根椐eax寄存器中的功能号__NR_xxx来调用sys_xxx()
+	pushl %eax
+	movl current,%eax
+	cmpl $0,state(%eax)		# state
+	jne reschedule
+	cmpl $0,counter(%eax)		# counter
+	je reschedule            #跳到上面的reschedule入口
+	
+/*
+ * 堆栈内容 in 'ret_from_system_call':
  *
  *	 0(%esp) - %eax
  *	 4(%esp) - %ebx
@@ -29,86 +103,7 @@
  *	28(%esp) - %oldesp
  *	2C(%esp) - %oldss
  */
-
-SIG_CHLD	= 17
-
-EAX		= 0x00
-EBX		= 0x04
-ECX		= 0x08
-EDX		= 0x0C
-FS		= 0x10
-ES		= 0x14
-DS		= 0x18
-EIP		= 0x1C
-CS		= 0x20
-EFLAGS		= 0x24
-OLDESP		= 0x28
-OLDSS		= 0x2C
-
-state	= 0		# these are offsets into the task-struct.
-counter	= 4
-priority = 8
-signal	= 12
-sigaction = 16		# MUST be 16 (=len of sigaction)
-blocked = (33*16)
-
-# offsets within sigaction
-sa_handler = 0
-sa_mask = 4
-sa_flags = 8
-sa_restorer = 12
-
-nr_system_calls = 72
-
-/*
- * Ok, I get parallel printer interrupts while using the floppy for some
- * strange reason. Urgel. Now I just ignore them.
- */
-.globl system_call,sys_fork,timer_interrupt,sys_execve
-.globl hd_interrupt,floppy_interrupt,parallel_interrupt
-.globl device_not_available, coprocessor_error
-
-.align 2
-bad_sys_call:
-	movl $-1,%eax
-	iret
-
-
-
-	
-.align 2
-reschedule:
-	pushl $ret_from_sys_call    #压栈，最后执行，为第五段
-	jmp schedule                #跳到schedule.c，执行中间3段
-		
-#五段论第一段入口，int 0x80入口
-.align 2
-system_call:
-	cmpl $nr_system_calls-1,%eax
-	ja bad_sys_call
-	push %ds
-	push %es
-	push %fs
-	pushl %edx
-	pushl %ecx		# push %ebx,%ecx,%edx as parameters
-	pushl %ebx		# to the system call
-	movl $0x10,%edx		# set up ds,es to kernel space
-	mov %dx,%ds
-	mov %dx,%es
-	movl $0x17,%edx		# fs points to local data space
-	mov %dx,%fs
-	
-	call sys_call_table(,%eax,4)   #根椐eax寄存器中的功能号__NR_xxx来调用sys_xxx()
-	
-	pushl %eax
-	movl current,%eax
-	cmpl $0,state(%eax)		# state
-	jne reschedule
-	cmpl $0,counter(%eax)		# counter
-	je reschedule            #跳到上面的reschedule入口
-
-#五段论最后一段入口
-ret_from_sys_call:
+ret_from_sys_call:         #五段论最后一段入口
 	movl current,%eax		# task[0] cannot have signals
 	cmpl task,%eax
 	je 3f
@@ -126,7 +121,7 @@ ret_from_sys_call:
 	movl %ebx,signal(%eax)
 	incl %ecx
 	pushl %ecx
-	call do_signal
+	call do_signal        #调用do_signal()
 	popl %eax
 3:	popl %eax
 	popl %ebx
@@ -139,8 +134,35 @@ ret_from_sys_call:
 
 
 
+#sys_fork()和sys_execve()是比较特殊的两个系统调用
+#需要先从汇编代码入口，再找到具体的实现函数
+.align 2
+sys_execve:                  
+	lea EIP(%esp),%eax
+	pushl %eax
+	call do_execve            #sys_execve---->do_execve()
+	addl $4,%esp
+	ret
+
+.align 2
+sys_fork:
+	call find_empty_process   #sys_fork---->find_empty_process()
+	testl %eax,%eax
+	js 1f
+	push %gs
+	pushl %esi
+	pushl %edi
+	pushl %ebp
+	pushl %eax
+	call copy_process         #sys_fork--->copy_process()
+	addl $20,%esp
+1:	ret
 
 
+
+
+#由于时钟中断、硬盘、软盘中断处理程序代码和system_call比较类似
+#所以对应的中断处理程序也在这里
 
 .align 2
 coprocessor_error:          #int 0x16 ：协处理器出错
@@ -188,7 +210,7 @@ device_not_available:       #int 0x7：设备不存在
 	ret
 
 .align 2
-timer_interrupt:         #int 0x32 时钟中断
+timer_interrupt:         #int 0x20 时钟中断
 	push %ds		# save ds,es and put kernel data space
 	push %es		# into them. %fs is used by _system_call
 	push %fs
@@ -210,38 +232,6 @@ timer_interrupt:         #int 0x32 时钟中断
 	call do_timer		# 'do_timer(long CPL)' does everything from
 	addl $4,%esp		# task switching to accounting ...
 	jmp ret_from_sys_call
-
-
-
-
-
-.align 2
-sys_execve:                  
-	lea EIP(%esp),%eax
-	pushl %eax
-	call do_execve
-	addl $4,%esp
-	ret
-
-.align 2
-sys_fork:
-	call find_empty_process
-	testl %eax,%eax
-	js 1f
-	push %gs
-	pushl %esi
-	pushl %edi
-	pushl %ebp
-	pushl %eax
-	call copy_process
-	addl $20,%esp
-1:	ret
-
-
-
-
-
-
 
 
 hd_interrupt:                 #int 0x46：银盘中断处理程序
@@ -275,7 +265,12 @@ hd_interrupt:                 #int 0x46：银盘中断处理程序
 	popl %eax
 	iret
 
-floppy_interrupt:            #int 0x48：银盘中断处理程序
+/*
+ * Ok, I get 并行打印机中断 while using the 软驱 for some strange reason. 
+ *Urgel（哼）. Now I just ignore them.
+ */
+
+floppy_interrupt:            #int 0x48：软盘驱动器中断处理程序
 	pushl %eax
 	pushl %ecx
 	pushl %edx
