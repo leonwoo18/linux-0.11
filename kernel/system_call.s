@@ -98,7 +98,7 @@ system_call:
 	movl $0x17,%edx		# fs points to local data space
 	mov %dx,%fs
 	
-	call sys_call_table(,%eax,4)   #根椐eax寄存器中的功能号来调用sys_xxx()
+	call sys_call_table(,%eax,4)   #根椐eax寄存器中的功能号__NR_xxx来调用sys_xxx()
 	
 	pushl %eax
 	movl current,%eax

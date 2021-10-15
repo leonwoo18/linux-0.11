@@ -12,25 +12,17 @@
  *inline关键字修饰的函数为内嵌函数
  *作用:直接将代码内嵌进来，不会发生调用，不会使用堆栈
  *fork()、pause()需要使用内嵌方式，以保证main()不会弄乱堆栈
+ *
+ *在本程序宏展开后，带着int 0x80中断和__NR_name系统调用功能号
+ *int 0x80---->system_call:---->eax(__NR_name)---->
+ *sys_cal_table[]元素位置---->对应的函数指针指向函数入口
  */
-static inline _syscall0(int,fork)  
-static inline _syscall0(int,pause)
-	/*
-	 * we need this inline内嵌语句 - forking from kernel space will result
-	 * in NO COPY ON WRITE (没有写时复制!!!), until an execve is executed. This
-	 * is no problem, but for the stack. This is handled by not letting
-	 * main() use the stack at all after fork(). Thus, no function
-	 * calls - which means inline code for fork too, as otherwise we
-	 * would use the stack upon exit from 'fork()'.
-	 *
-	 * Actually only pause and fork are needed inline, so that there
-	 * won't be any messing with the stack from main(), but we define
-	 * some others too.
-	 */
+static inline _syscall0(int,fork)      //int fork()系统调用
+static inline _syscall0(int,pause)     //int pause()系统调用
 
 
-static inline _syscall1(int,setup,void *,BIOS)   //仅在此程序的init()被调用
-static inline _syscall0(int,sync)
+static inline _syscall1(int,setup,void *,BIOS)   //int setup(void * BIOS)系统调用,仅在此程序的init()被调用
+static inline _syscall0(int,sync)      //int sync()系统调用
 
 #include <linux/tty.h>
 #include <linux/sched.h>
